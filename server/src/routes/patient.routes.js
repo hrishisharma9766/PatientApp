@@ -1,11 +1,12 @@
 import { Router } from 'express'
-import { getPatients, searchPatients, setPatientState } from '../controllers/patient.controller.js'
+import { getPatients, searchPatients, setPatientState, addPatient } from '../controllers/patient.controller.js'
 import { validate, validateBody } from '../middlewares/validate.js'
 import Joi from 'joi'
 
 const router = Router()
 
 router.get('/', getPatients)
+router.post('/', addPatient)
 
 const searchSchema = Joi.object({
   q: Joi.string().allow('').default(''),

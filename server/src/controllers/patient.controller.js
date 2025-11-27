@@ -1,4 +1,4 @@
-import { listPatients, filterPatients, updatePatientState } from '../services/patient.service.js'
+import { listPatients, filterPatients, updatePatientState, createPatient } from '../services/patient.service.js'
 
 export async function getPatients(req, res, next) {
   try {
@@ -26,6 +26,17 @@ export async function setPatientState(req, res, next) {
     const updated = await updatePatientState(id, state)
     if (!updated) return res.status(404).json({ error: 'Patient not found' })
     res.json(updated)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function addPatient(req, res, next) {
+  try {
+    const p = req.body || {}
+    const created = await createPatient(p)
+    if (!created) return res.status(400).json({ error: 'Failed to create patient' })
+    res.status(201).json(created)
   } catch (err) {
     next(err)
   }

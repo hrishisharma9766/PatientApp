@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import axios from 'axios'
 import { X, Search, Accessibility } from 'lucide-react'
 
 interface FindPatientModalProps {
@@ -44,9 +45,9 @@ export function FindPatientModal({ open, onClose, onCreateNew, onStartVisit }: F
 
   useEffect(() => {
     if (!open) return
-    fetch('http://localhost:4000/api/providers')
-      .then(r => r.json())
-      .then((list: string[]) => {
+    axios.get('http://localhost:4000/api/providers')
+      .then(res => {
+        const list: string[] = res.data
         setProviders(list)
         setProvider(list[0] ?? DEFAULT_PROVIDERS[0])
       })
@@ -129,20 +130,29 @@ export function FindPatientModal({ open, onClose, onCreateNew, onStartVisit }: F
                 })}
               </div>
             )}
-            <button
-              type="button"
-              onClick={() => {
-                if (filtered.length > 0 && selectedId) {
-                  onStartVisit?.(selectedId, provider)
-                  onClose()
-                } else {
+            <div className="mt-8 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
                   onCreateNew?.()
-                }
-              }}
-              className="mt-8 w-full rounded-lg bg-black py-3 text-sm font-semibold text-white shadow-sm hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
-            >
-              {filtered.length > 0 ? 'Start New Visit' : 'Create New Patient'}
-            </button>
+                }}
+                className="w-full rounded-lg bg-gray-100 py-3 text-sm font-semibold text-gray-900 shadow-sm hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2"
+              >
+                Create New Patient
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (filtered.length > 0 && selectedId) {
+                    onStartVisit?.(selectedId, provider)
+                    onClose()
+                  }
+                }}
+                className="w-full rounded-lg bg-black py-3 text-sm font-semibold text-white shadow-sm hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
+              >
+                Start New Visit
+              </button>
+            </div>
           </div>
         </div>
       </div>

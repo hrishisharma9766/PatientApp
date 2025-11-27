@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import axios from 'axios'
+import { CreatePatientModal } from '../components/CreatePatientModal'
 import { Menu, Search, MoreVertical, Calendar, ChevronDown, ArrowLeftRight, Check, CircleDot, Mic } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { FindPatientModal } from '../components/FindPatientModal'
@@ -13,11 +15,15 @@ export default function PatientList() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [selectedPatient, setSelectedPatient] = useState<string>('')
   const [patients, setPatients] = useState<{ id: string, name: string, dob: string, age: number, time?: string, state?: 'idle'|'start'|'paused'|'complete' }[]>([])
+  const [createOpen, setCreateOpen] = useState(false)
 
   useEffect(() => {
-    fetch('http://localhost:4000/api/patients')
-      .then(r => r.json())
-      .then(setPatients)
+    axios.get('http://localhost:4000/api/patients')
+      .then(res => {
+        const data = res.data
+        if (Array.isArray(data)) setPatients(data)
+        else setPatients([])
+      })
       .catch(() => setPatients([]))
   }, [])
 
@@ -95,7 +101,7 @@ export default function PatientList() {
 
         <div className="px-4 pb-4 space-y-3">
           {filtered.map((p) => (
-            <div key={p.name} className="rounded-md border border-gray-200 bg-white px-4 py-3">
+            <div key={p.id || `${p.name}-${p.dob}`} className="rounded-md border border-gray-200 bg-white px-4 py-3">
               <div className="flex items-center justify-between">
                 <div className="text-[15px] font-semibold text-gray-900">
                   {p.name} <span className="text-gray-500">| {p.time}</span>
@@ -160,11 +166,20 @@ export default function PatientList() {
         <FindPatientModal
           open={findOpen}
           onClose={() => setFindOpen(false)}
-          onCreateNew={() => alert('Create New Patient')}
+          onCreateNew={() => setCreateOpen(true)}
           onStartVisit={(patientId, provider) => {
             setFindOpen(false)
             const p = patients.find(x => String(x.id) === patientId)
             navigate('/record', { state: { patient: p ? { ...p, provider } : { id: patientId, name: '', dob: '', age: 0, provider } } })
+          }}
+        />
+        <CreatePatientModal
+          open={createOpen}
+          onClose={() => setCreateOpen(false)}
+          onCreated={(created) => {
+            setPatients(prev => [created, ...prev])
+            setCreateOpen(false)
+            setFindOpen(false)
           }}
         />
       </div>

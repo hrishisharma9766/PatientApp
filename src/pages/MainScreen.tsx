@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import axios from 'axios'
 import { ArrowLeft, Menu } from 'lucide-react'
 import PatientList from './PatientList'
 import { LoginModal } from '../components/LoginModal'
@@ -47,11 +48,7 @@ export function MainScreen() {
     setSoapDismissed(false)
     hasSnapshotRef.current = false
     if (passed?.id) {
-      fetch(`http://localhost:4000/api/patients/${passed.id}/state`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state: 'start' })
-      }).catch(() => {})
+      axios.patch(`http://localhost:4000/api/patients/${passed.id}/state`, { state: 'start' }).catch(() => {})
     }
     if (!recorder) {
       navigator.mediaDevices.getUserMedia({ audio: true }).then(ms => {
@@ -73,7 +70,7 @@ export function MainScreen() {
           if (passed?.id && full.size > 0) {
             const fd = new FormData()
             fd.append('file', full, `${passed.id}.${blobType.includes('ogg') ? 'ogg' : 'webm'}`)
-            fetch(`http://localhost:4000/api/audio/${passed.id}?mode=replace`, { method: 'POST', body: fd })
+            axios.post(`http://localhost:4000/api/audio/${passed.id}?mode=replace`, fd)
               .then(() => setAudioUrl(`http://localhost:4000/api/audio/${passed.id}?t=${Date.now()}`))
               .catch(() => {})
           }
@@ -100,11 +97,7 @@ export function MainScreen() {
     setRecordingStatus('paused')
     setSoapDismissed(false)
     if (passed?.id) {
-      fetch(`http://localhost:4000/api/patients/${passed.id}/state`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state: 'paused' })
-      }).catch(() => {})
+      axios.patch(`http://localhost:4000/api/patients/${passed.id}/state`, { state: 'paused' }).catch(() => {})
     }
     if (recorder && recorder.state === 'recording') {
       recorder.pause()
@@ -113,15 +106,15 @@ export function MainScreen() {
         const mime = recorder && 'mimeType' in recorder ? (recorder as MediaRecorder).mimeType : ''
         const blobType = mime.includes('ogg') ? 'audio/ogg' : 'audio/webm'
         const full = new Blob(allChunksRef.current, { type: blobType })
-        if (passed?.id && full.size > 0) {
-          const fd = new FormData()
-          fd.append('file', full, `${passed.id}.${blobType.includes('ogg') ? 'ogg' : 'webm'}`)
-          fetch(`http://localhost:4000/api/audio/${passed.id}?mode=replace`, { method: 'POST', body: fd })
-            .then(() => setAudioUrl(`http://localhost:4000/api/audio/${passed.id}?t=${Date.now()}`))
-            .catch(() => {})
-          hasSnapshotRef.current = true
-          deltaChunksRef.current = []
-        }
+          if (passed?.id && full.size > 0) {
+            const fd = new FormData()
+            fd.append('file', full, `${passed.id}.${blobType.includes('ogg') ? 'ogg' : 'webm'}`)
+            axios.post(`http://localhost:4000/api/audio/${passed.id}?mode=replace`, fd)
+              .then(() => setAudioUrl(`http://localhost:4000/api/audio/${passed.id}?t=${Date.now()}`))
+              .catch(() => {})
+            hasSnapshotRef.current = true
+            deltaChunksRef.current = []
+          }
       }, 200)
     }
   }
@@ -136,11 +129,7 @@ export function MainScreen() {
         setSoapOpen(true)
       }
       if (passed?.id) {
-        fetch(`http://localhost:4000/api/patients/${passed.id}/state`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ state: 'complete' })
-        }).catch(() => {})
+        axios.patch(`http://localhost:4000/api/patients/${passed.id}/state`, { state: 'complete' }).catch(() => {})
       }
       if (recorder) {
         try { if (recorder.state !== 'inactive') recorder.requestData() } catch { /* ignore */ }

@@ -9,6 +9,7 @@ import providersRouter from './routes/providers.routes.js'
 import audioRouter from './routes/audio.routes.js'
 import { notFoundHandler } from './middlewares/notFound.js'
 import { errorHandler } from './middlewares/error.js'
+import { pool } from './config/db.js'
 
 const app = express()
 
@@ -35,4 +36,9 @@ app.use(errorHandler)
 const PORT = process.env.PORT || 4000
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`)
+  pool.query('SELECT 1').then(() => {
+    console.log('DB connectivity OK')
+  }).catch(err => {
+    console.error('DB connectivity FAILED', err?.message)
+  })
 })
