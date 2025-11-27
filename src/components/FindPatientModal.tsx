@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import axios from 'axios'
+import { api } from '../lib/api'
 import { X, Search, Accessibility } from 'lucide-react'
 
 interface FindPatientModalProps {
@@ -45,7 +45,7 @@ export function FindPatientModal({ open, onClose, onCreateNew, onStartVisit }: F
 
   useEffect(() => {
     if (!open) return
-    axios.get('http://localhost:4000/api/providers')
+    api.get('/providers')
       .then(res => {
         const list: string[] = res.data
         setProviders(list)

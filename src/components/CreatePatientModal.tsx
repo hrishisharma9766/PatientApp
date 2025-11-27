@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Calendar } from 'lucide-react'
-import axios from 'axios'
+import { api } from '../lib/api'
 
 interface CreatePatientModalProps {
   open: boolean
@@ -42,7 +42,7 @@ export function CreatePatientModal({ open, onClose, onCreated }: CreatePatientMo
       const id = String(Date.now()).slice(-6)
       const name = `${firstName} ${lastName}`.trim()
       const body = { id, name, dob: mmddyyyy, age, time: '', state: 'idle' }
-      const res = await axios.post('http://localhost:4000/api/patients', body)
+      const res = await api.post('/patients', body)
       const created = res.data
       onCreated?.(created)
     } catch {

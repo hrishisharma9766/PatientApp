@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
-import axios from 'axios'
+import { api } from '../lib/api'
 import { CreatePatientModal } from '../components/CreatePatientModal'
 import { Menu, Search, MoreVertical, Calendar, ChevronDown, ArrowLeftRight, Check, CircleDot, Mic } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { FindPatientModal } from '../components/FindPatientModal'
 import { PatientOptionsSheet } from '../components/PatientOptionsSheet'
+import { useAuth } from '../context/useAuth'
 
 export default function PatientList() {
   const navigate = useNavigate()
+  const { user, signOut } = useAuth()
   const [findOpen, setFindOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [dob, setDob] = useState('')
@@ -18,7 +20,7 @@ export default function PatientList() {
   const [createOpen, setCreateOpen] = useState(false)
 
   useEffect(() => {
-    axios.get('http://localhost:4000/api/patients')
+    api.get('/patients')
       .then(res => {
         const data = res.data
         if (Array.isArray(data)) setPatients(data)
@@ -50,9 +52,20 @@ export default function PatientList() {
             <div className="text-xs text-gray-500">eSCRIBE</div>
             <div className="text-lg font-semibold text-[#1266cc]">eScribe</div>
           </div>
-          <button className="p-2 rounded-md hover:bg-gray-100">
-            <Menu className="w-5 h-5 text-gray-700" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button className="p-2 rounded-md hover:bg-gray-100">
+              <Menu className="w-5 h-5 text-gray-700" />
+            </button>
+            {user && (
+              <button
+                type="button"
+                onClick={async () => { await signOut(); navigate('/') }}
+                className="rounded-md bg-black px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-gray-900"
+              >
+                Sign Out
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="px-4 pb-3">
@@ -101,14 +114,19 @@ export default function PatientList() {
 
         <div className="px-4 pb-4 space-y-3">
           {filtered.map((p) => (
-            <div key={p.id || `${p.name}-${p.dob}`} className="rounded-md border border-gray-200 bg-white px-4 py-3">
+            <div
+              key={p.id || `${p.name}-${p.dob}`}
+              className="rounded-md border border-gray-200 bg-white px-4 py-3 cursor-pointer"
+              onClick={() => navigate('/record', { state: { patient: p } })}
+            >
               <div className="flex items-center justify-between">
                 <div className="text-[15px] font-semibold text-gray-900">
                   {p.name} <span className="text-gray-500">| {p.time}</span>
                 </div>
                 <button
                   className="p-1 rounded-sm hover:bg-gray-100"
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation()
                     setSelectedPatient(`${p.name} | DOB: ${p.dob}`)
                     setSheetOpen(true)
                   }}

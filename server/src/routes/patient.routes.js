@@ -1,12 +1,13 @@
 import { Router } from 'express'
 import { getPatients, searchPatients, setPatientState, addPatient } from '../controllers/patient.controller.js'
+import { validateToken } from '../middlewares/validateToken.js'
 import { validate, validateBody } from '../middlewares/validate.js'
 import Joi from 'joi'
 
 const router = Router()
 
 router.get('/', getPatients)
-router.post('/', addPatient)
+router.post('/', validateToken, addPatient)
 
 const searchSchema = Joi.object({
   q: Joi.string().allow('').default(''),
@@ -16,6 +17,6 @@ const searchSchema = Joi.object({
 router.get('/search', validate(searchSchema), searchPatients)
 
 const stateSchema = Joi.object({ state: Joi.string().valid('idle','start','paused','complete').required() })
-router.patch('/:id/state', validateBody(stateSchema), setPatientState)
+router.patch('/:id/state', validateToken, validateBody(stateSchema), setPatientState)
 
 export default router

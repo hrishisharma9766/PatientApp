@@ -1,27 +1,26 @@
 import { useState } from 'react'
+import { api } from '../lib/api'
 import { useNavigate } from 'react-router-dom'
 import { X } from 'lucide-react'
+import { useAuth } from '../context/useAuth'
 
 export default function SignIn() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const navigate = useNavigate()
+  const { signIn } = useAuth()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     try {
-      const res = await fetch('http://localhost:4000/api/auth/signin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      })
-      if (!res.ok) {
-        setError('Invalid credentials')
+      const res = await api.post('/auth/signin', { email, password }, { validateStatus: () => true })
+      if (res.status !== 200) {
+        setError(res.data?.error || 'Invalid credentials')
         return
       }
-      await res.json()
+      await signIn(email, password)
       navigate('/patients')
     } catch {
       setError('Network error')

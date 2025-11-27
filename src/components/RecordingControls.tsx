@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Mic, Pause, Square } from 'lucide-react'
+import { Mic, Pause, Square, Play } from 'lucide-react'
 
 interface RecordingControlsProps {
   status: string
@@ -17,19 +17,14 @@ export function RecordingControls({ status, timer, className, onStarted, onStopp
     const s = parseInt(parts[1] || '0', 10)
     return m * 60 + s
   }, [timer])
-  const initialState = (() => {
-    const v = status.toLowerCase()
-    if (v === 'recording') return 'recording'
-    if (v === 'paused') return 'paused'
-    if (v === 'stopped') return 'stopped'
-    return 'stopped'
+  const curStatus = (() => {
+    const v = status?.toLowerCase?.() || 'stopped'
+    return v === 'recording' || v === 'paused' ? v : 'stopped'
   })() as 'recording' | 'paused' | 'stopped'
-
-  const [recState, setRecState] = useState<'recording' | 'paused' | 'stopped'>(initialState)
   const [seconds, setSeconds] = useState(initialSeconds)
   const [hasInteracted, setHasInteracted] = useState(false)
 
-  const isRecording = recState === 'recording'
+  const isRecording = curStatus === 'recording'
 
   useEffect(() => {
     let id: number | undefined
@@ -52,30 +47,42 @@ export function RecordingControls({ status, timer, className, onStarted, onStopp
   }, [seconds])
 
   function toggle() {
-    setRecState((s) => (s === 'recording' ? 'paused' : 'recording'))
+    if (curStatus === 'stopped') {
+      onStarted?.()
+      return
+    }
+    if (curStatus === 'recording') {
+      onPaused?.()
+      setHasInteracted(true)
+      return
+    }
+    onStarted?.()
     setHasInteracted(true)
   }
 
   function stop() {
-    setRecState('stopped')
+    onStopped?.()
     setSeconds(0)
     setHasInteracted(true)
   }
 
   useEffect(() => {
-    if (!hasInteracted) return
-    if (recState === 'recording') onStarted?.()
-    else if (recState === 'paused') onPaused?.()
-    else onStopped?.()
-  }, [recState, hasInteracted, onStarted, onPaused, onStopped])
+    if (!isRecording) return
+    const id = window.setInterval(() => {
+      setSeconds((v) => v + 1)
+    }, 1000)
+    return () => {
+      window.clearInterval(id)
+    }
+  }, [isRecording])
 
   return (
     <div className={`mt-4 ${className ?? ''}`}>
       <div className="flex flex-col items-center">
         <div className="font-mono text-4xl text-gray-900">{display}</div>
         <div className="mt-1 flex items-center">
-          <span className={`inline-block w-2.5 h-2.5 rounded-full mr-2 ${recState === 'recording' ? 'bg-green-600' : recState === 'paused' ? 'bg-gray-400' : 'bg-red-600'}`}></span>
-          <span className="text-sm text-gray-800">{recState === 'recording' ? 'Recording' : recState === 'paused' ? 'Paused' : 'Stopped'}</span>
+          <span className={`inline-block w-2.5 h-2.5 rounded-full mr-2 ${curStatus === 'recording' ? 'bg-green-600' : curStatus === 'paused' ? 'bg-gray-400' : 'bg-red-600'}`}></span>
+          <span className="text-sm text-gray-800">{curStatus === 'recording' ? 'Recording' : curStatus === 'paused' ? 'Paused' : 'Stopped'}</span>
         </div>
       </div>
       <div className="mt-3 flex items-center justify-center gap-3">
@@ -96,6 +103,8 @@ export function RecordingControls({ status, timer, className, onStarted, onStopp
           >
             {isRecording ? (
               <Pause className="w-6 h-6" />
+            ) : curStatus === 'paused' ? (
+              <Play className="w-6 h-6" />
             ) : (
               <Mic className={`w-6 h-6 ${hasInteracted ? 'text-white' : 'text-green-200'}`} />
             )}

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import axios from 'axios'
+import { api } from '../lib/api'
 import { ArrowLeft, Menu } from 'lucide-react'
 import PatientList from './PatientList'
 import { LoginModal } from '../components/LoginModal'
+import { useAuth } from '../context/useAuth'
 import { PatientInfoPanel } from '../components/PatientInfoPanel'
 import { RecordingControls } from '../components/RecordingControls'
 import { TabNavigation } from '../components/TabNavigation'
@@ -12,14 +13,17 @@ import { PopperNotice } from '../components/PopperNotice'
 import { SoapNotesModal } from '../components/SoapNotesModal'
 import { SoapNotePanel } from '../components/SoapNotePanel'
 import { PatientOptionsSheet } from '../components/PatientOptionsSheet'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { ReplaceRecordingModal } from '../components/ReplaceRecordingModal'
 
 type VisitPatient = { id: string, name: string, dob: string, age: number, provider?: string }
 
 export function MainScreen() {
   const location = useLocation()
+  const navigate = useNavigate()
   const passed = (location.state as { patient?: VisitPatient })?.patient
   const [activeTab, setActiveTab] = useState('Dictation')
+  const { user, signIn, signOut } = useAuth()
   const [noticeVisible, setNoticeVisible] = useState(false)
   const [noticeMessage, setNoticeMessage] = useState('')
   const [noticeVariant, setNoticeVariant] = useState<'started' | 'paused' | 'stopped'>('started')
@@ -34,21 +38,34 @@ export function MainScreen() {
   const [loginOpen, setLoginOpen] = useState(false)
   const [showPatients, setShowPatients] = useState(false)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
+  const prevAudioUrlRef = useRef<string | null>(null)
+  const [replaceOpen, setReplaceOpen] = useState(false)
+  const [, setPendingOverwrite] = useState(false)
   const [stream, setStream] = useState<MediaStream | null>(null)
   const [recorder, setRecorder] = useState<MediaRecorder | null>(null)
   const deltaChunksRef = useRef<Blob[]>([])
   const allChunksRef = useRef<Blob[]>([])
   const hasSnapshotRef = useRef<boolean>(false)
+  const serverAudioRef = useRef<boolean>(false)
+  const sessionStartedRef = useRef<boolean>(false)
 
-  const handleStarted = () => {
+  const handleStarted = (force?: boolean) => {
+    const isIdleOrPaused = recordingStatus === 'idle' || recordingStatus === 'stopped' || recordingStatus === 'paused'
+    const shouldPromptOverwrite = !force && serverAudioRef.current && !sessionStartedRef.current && isIdleOrPaused
+    if (shouldPromptOverwrite) {
+      setReplaceOpen(true)
+      return
+    }
     setNoticeMessage('Recording Started')
     setNoticeVariant('started')
     setNoticeVisible(true)
     setRecordingStatus('recording')
     setSoapDismissed(false)
     hasSnapshotRef.current = false
+    sessionStartedRef.current = true
+    if (!user) { setLoginOpen(true); return }
     if (passed?.id) {
-      axios.patch(`http://localhost:4000/api/patients/${passed.id}/state`, { state: 'start' }).catch(() => {})
+      api.patch(`/patients/${passed.id}/state`, { state: 'start' }).catch(() => {})
     }
     if (!recorder) {
       navigator.mediaDevices.getUserMedia({ audio: true }).then(ms => {
@@ -70,8 +87,17 @@ export function MainScreen() {
           if (passed?.id && full.size > 0) {
             const fd = new FormData()
             fd.append('file', full, `${passed.id}.${blobType.includes('ogg') ? 'ogg' : 'webm'}`)
-            axios.post(`http://localhost:4000/api/audio/${passed.id}?mode=replace`, fd)
-              .then(() => setAudioUrl(`http://localhost:4000/api/audio/${passed.id}?t=${Date.now()}`))
+            api.post(`/audio/${passed.id}?mode=replace`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+              .then(async () => {
+                try {
+                  const res = await api.get(`/audio/${passed.id}`, { responseType: 'blob', params: { t: Date.now() } })
+                  const url = URL.createObjectURL(res.data as Blob)
+                  const prev = prevAudioUrlRef.current
+                  if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev)
+                  setAudioUrl(url)
+                  prevAudioUrlRef.current = url
+                } catch { void 0 }
+              })
               .catch(() => {})
           }
           deltaChunksRef.current = []
@@ -86,6 +112,48 @@ export function MainScreen() {
     } else {
       if (recorder.state === 'paused') {
         recorder.resume()
+      } else if (recorder.state === 'inactive') {
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(ms => {
+          setStream(ms)
+          const desired = 'audio/ogg;codecs=opus'
+          const fallback = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm'
+          const chosen = MediaRecorder.isTypeSupported(desired) ? desired : fallback
+          const rec = new MediaRecorder(ms, { mimeType: chosen })
+          rec.ondataavailable = e => {
+            if (e.data && e.data.size > 0) {
+              deltaChunksRef.current.push(e.data)
+              allChunksRef.current.push(e.data)
+            }
+          }
+          rec.onstop = () => {
+            const mime = rec.mimeType || ''
+            const blobType = mime.includes('ogg') ? 'audio/ogg' : 'audio/webm'
+            const full = new Blob(allChunksRef.current, { type: blobType })
+            if (passed?.id && full.size > 0) {
+              const fd = new FormData()
+              fd.append('file', full, `${passed.id}.${blobType.includes('ogg') ? 'ogg' : 'webm'}`)
+              api.post(`/audio/${passed.id}?mode=replace`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+                .then(async () => {
+                  try {
+                    const res = await api.get(`/audio/${passed.id}`, { responseType: 'blob', params: { t: Date.now() } })
+                    const url = URL.createObjectURL(res.data as Blob)
+                    const prev = prevAudioUrlRef.current
+                    if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev)
+                    setAudioUrl(url)
+                    prevAudioUrlRef.current = url
+                  } catch { void 0 }
+                })
+                .catch(() => {})
+            }
+            deltaChunksRef.current = []
+            allChunksRef.current = []
+            hasSnapshotRef.current = false
+          }
+          setRecorder(rec)
+          deltaChunksRef.current = []
+          allChunksRef.current = []
+          rec.start()
+        }).catch(() => {})
       }
     }
   }
@@ -96,8 +164,9 @@ export function MainScreen() {
     setNoticeVisible(true)
     setRecordingStatus('paused')
     setSoapDismissed(false)
+    if (!user) { setLoginOpen(true); return }
     if (passed?.id) {
-      axios.patch(`http://localhost:4000/api/patients/${passed.id}/state`, { state: 'paused' }).catch(() => {})
+      api.patch(`/patients/${passed.id}/state`, { state: 'paused' }).catch(() => {})
     }
     if (recorder && recorder.state === 'recording') {
       recorder.pause()
@@ -109,8 +178,17 @@ export function MainScreen() {
           if (passed?.id && full.size > 0) {
             const fd = new FormData()
             fd.append('file', full, `${passed.id}.${blobType.includes('ogg') ? 'ogg' : 'webm'}`)
-            axios.post(`http://localhost:4000/api/audio/${passed.id}?mode=replace`, fd)
-              .then(() => setAudioUrl(`http://localhost:4000/api/audio/${passed.id}?t=${Date.now()}`))
+            api.post(`/audio/${passed.id}?mode=replace`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+              .then(async () => {
+                try {
+                  const res = await api.get(`/audio/${passed.id}`, { responseType: 'blob', params: { t: Date.now() } })
+                  const url = URL.createObjectURL(res.data as Blob)
+                  const prev = prevAudioUrlRef.current
+                  if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev)
+                  setAudioUrl(url)
+                  prevAudioUrlRef.current = url
+                } catch { void 0 }
+              })
               .catch(() => {})
             hasSnapshotRef.current = true
             deltaChunksRef.current = []
@@ -128,8 +206,9 @@ export function MainScreen() {
       if (!soapDismissed && !soapOpen) {
         setSoapOpen(true)
       }
+      if (!user) { setLoginOpen(true); return }
       if (passed?.id) {
-        axios.patch(`http://localhost:4000/api/patients/${passed.id}/state`, { state: 'complete' }).catch(() => {})
+        api.patch(`/patients/${passed.id}/state`, { state: 'complete' }).catch(() => {})
       }
       if (recorder) {
         try { if (recorder.state !== 'inactive') recorder.requestData() } catch { /* ignore */ }
@@ -140,6 +219,8 @@ export function MainScreen() {
         setStream(null)
       }
       // final upload now occurs in recorder.onstop
+      sessionStartedRef.current = false
+      serverAudioRef.current = true
     }
   }
 
@@ -148,6 +229,26 @@ export function MainScreen() {
     const id = setTimeout(() => setNoticeVisible(false), 3000)
     return () => clearTimeout(id)
   }, [noticeVisible])
+
+  useEffect(() => {
+    if (!passed?.id) return
+    api.get(`/audio/${passed.id}`, { responseType: 'blob' })
+      .then(res => {
+        const blob = res.data as Blob
+        const url = URL.createObjectURL(blob)
+        const prev = prevAudioUrlRef.current
+        if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev)
+        setAudioUrl(url)
+        prevAudioUrlRef.current = url
+        setRecordingStatus('paused')
+        serverAudioRef.current = true
+      })
+      .catch(() => {
+        setAudioUrl(null)
+        setRecordingStatus('idle')
+        serverAudioRef.current = false
+      })
+  }, [passed?.id])
 
   if (showPatients) {
     return <PatientList />
@@ -180,10 +281,18 @@ export function MainScreen() {
       <div className="mt-3 flex justify-end">
         <button
           type="button"
-          onClick={() => setLoginOpen(true)}
+          onClick={async () => {
+            if (user) {
+              await signOut()
+              setShowPatients(false)
+              navigate('/')
+            } else {
+              setLoginOpen(true)
+            }
+          }}
           className="rounded-md bg-black px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-900"
         >
-          Sign In
+          {user ? 'Sign Out' : 'Sign In'}
         </button>
       </div>
 
@@ -211,14 +320,14 @@ export function MainScreen() {
       <RecordingControls
         status={recordingStatus}
         timer="00:00"
-        onStarted={handleStarted}
+        onStarted={() => handleStarted()}
         onPaused={handlePaused}
         onStopped={handleStopped}
       />
 
       {audioUrl && (
         <div className="mt-3">
-          <audio src={audioUrl} controls className="w-full" crossOrigin="anonymous" />
+          <audio key={audioUrl} src={audioUrl} controls className="w-full" crossOrigin="anonymous" />
         </div>
       )}
 
@@ -257,11 +366,29 @@ export function MainScreen() {
         />
       )}
 
+      <ReplaceRecordingModal
+        open={replaceOpen}
+        onCancel={() => {
+          setPendingOverwrite(false)
+          setReplaceOpen(false)
+        }}
+        onStart={() => {
+          setPendingOverwrite(false)
+          setReplaceOpen(false)
+          setRecordingStatus('idle')
+          setAudioUrl(null)
+          serverAudioRef.current = false
+          sessionStartedRef.current = true
+          setTimeout(() => handleStarted(true), 0)
+        }}
+      />
+
       {/* LOGIN MODAL */}
       <LoginModal
         open={loginOpen}
         onClose={() => setLoginOpen(false)}
-        onSubmit={async () => {
+        onSubmit={async (email, password) => {
+          await signIn(email, password)
           setLoginOpen(false)
           setShowPatients(true)
         }}

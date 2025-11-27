@@ -71,3 +71,34 @@ export default defineConfig([
   },
 ])
 ```
+
+## Server: Connect to Supabase (Postgres)
+
+If you're using the included server and want to connect it to a Supabase Postgres instance, use the following steps:
+
+1. Add a `server/.env` file (do not commit!). Use either a full `DATABASE_URL` or individual DB parts:
+
+```text
+# Full URL (encode special chars in password, e.g. @ -> %40):
+DATABASE_URL=postgresql://postgres:Hanuman%409766@db.rfgxemqlkylyttjsrxzi.supabase.co:5432/postgres
+
+# Or parts (DB_PASSWORD does NOT need encoding):
+DB_HOST=db.rfgxemqlkylyttjsrxzi.supabase.co
+DB_USER=postgres
+DB_PASSWORD=Hanuman@9766
+DB_PORT=5432
+DB_NAME=postgres
+```
+
+2. Start the server in the `server` folder:
+
+```powershell
+cd server
+npm install
+npm run dev
+```
+
+3. The server logs will attempt a simple `SELECT 1` at startup to verify connectivity.
+
+4. If you get connection issues, ensure the password is URL-encoded when using `DATABASE_URL` (use `%40` for `@`) and that you have access to the Supabase DB.
+
