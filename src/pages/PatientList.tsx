@@ -195,7 +195,10 @@ export default function PatientList() {
           open={createOpen}
           onClose={() => setCreateOpen(false)}
           onCreated={(created) => {
-            setPatients(prev => [created, ...prev])
+            const allowed = ['idle','start','paused','complete'] as const
+            const normalizedState = allowed.includes((created.state as any)) ? (created.state as typeof allowed[number]) : undefined
+            const safeCreated = { ...created, state: normalizedState }
+            setPatients(prev => [safeCreated, ...prev])
             setCreateOpen(false)
             setFindOpen(false)
           }}

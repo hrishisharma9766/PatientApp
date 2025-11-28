@@ -5,7 +5,7 @@ import { api } from '../lib/api'
 interface CreatePatientModalProps {
   open: boolean
   onClose: () => void
-  onCreated?: (patient: { id: string, name: string, dob: string, age: number, time?: string, state?: string }) => void
+  onCreated?: (patient: { id: string, name: string, dob: string, age: number, time?: string, state?: 'idle'|'start'|'paused'|'complete' }) => void
 }
 
 const GENDERS = ['Female','Male','Other']
