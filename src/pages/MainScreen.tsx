@@ -89,6 +89,7 @@ export function MainScreen() {
           if (passed?.id && full.size > 0) {
             const fd = new FormData()
             fd.append('file', full, `${passed.id}.${blobType.includes('ogg') ? 'ogg' : 'webm'}`)
+            setUploading(true)
             api.post(`/audio/${passed.id}/transcribe`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
               .then(async (res) => {
                 const prev = prevAudioUrlRef.current
@@ -104,8 +105,9 @@ export function MainScreen() {
                   await new Promise(r => setTimeout(r, 1000))
                 }
                 setTranscript(text ? text.split(/\n+/).map((line: string) => ({ speaker: 'A', text: line })) : [])
+                setUploading(false)
               })
-              .catch(() => {})
+              .catch(() => { setUploading(false) })
           }
           deltaChunksRef.current = []
           allChunksRef.current = []
@@ -139,6 +141,7 @@ export function MainScreen() {
             if (passed?.id && full.size > 0) {
               const fd = new FormData()
               fd.append('file', full, `${passed.id}.${blobType.includes('ogg') ? 'ogg' : 'webm'}`)
+              setUploading(true)
               api.post(`/audio/${passed.id}/transcribe`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
                 .then(async (res) => {
                   const prev = prevAudioUrlRef.current
@@ -154,8 +157,9 @@ export function MainScreen() {
                     await new Promise(r => setTimeout(r, 1000))
                   }
                   setTranscript(text ? text.split(/\n+/).map((line: string) => ({ speaker: 'A', text: line })) : [])
+                  setUploading(false)
                 })
-                .catch(() => {})
+                .catch(() => { setUploading(false) })
             }
             deltaChunksRef.current = []
             allChunksRef.current = []
@@ -455,8 +459,8 @@ export function MainScreen() {
       {uploading && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-md p-4 shadow-lg w-64 text-center">
-            <div className="animate-pulse text-gray-800 font-semibold">Uploading...</div>
-            <div className="mt-2 text-xs text-gray-600">Processing transcription</div>
+            <div className="animate-pulse text-gray-800 font-semibold">Generating SOAP...</div>
+            <div className="mt-2 text-xs text-gray-600">Saving audio and transcription</div>
           </div>
         </div>
       )}
