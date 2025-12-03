@@ -103,7 +103,7 @@ export function MainScreen() {
                   if (text) break
                   await new Promise(r => setTimeout(r, 1000))
                 }
-                setTranscript(text ? text.split(/\n+/).map(line => ({ speaker: 'A', text: line })) : [])
+                setTranscript(text ? text.split(/\n+/).map((line: string) => ({ speaker: 'A', text: line })) : [])
               })
               .catch(() => {})
           }
@@ -153,7 +153,7 @@ export function MainScreen() {
                     if (text) break
                     await new Promise(r => setTimeout(r, 1000))
                   }
-                  setTranscript(text ? text.split(/\n+/).map(line => ({ speaker: 'A', text: line })) : [])
+                  setTranscript(text ? text.split(/\n+/).map((line: string) => ({ speaker: 'A', text: line })) : [])
                 })
                 .catch(() => {})
             }
@@ -257,7 +257,7 @@ export function MainScreen() {
         try {
           const tr = await api.get(`/audio/${passed.id}/transcription`, { params: { t: Date.now() } })
           const text = tr.data?.transcription || ''
-          setTranscript(text ? text.split(/\n+/).map(line => ({ speaker: 'A', text: line })) : [])
+          setTranscript(text ? text.split(/\n+/).map((line: string) => ({ speaker: 'A', text: line })) : [])
         } catch { setTranscript([]) }
       })
       .catch(() => {
@@ -360,7 +360,7 @@ export function MainScreen() {
               if (text) break
               await new Promise(r => setTimeout(r, 1000))
             }
-            setTranscript(text ? text.split(/\n+/).map(line => ({ speaker: 'A', text: line })) : [])
+            setTranscript(text ? text.split(/\n+/).map((line: string) => ({ speaker: 'A', text: line })) : [])
             setUploading(false)
           } catch {}
         }}
