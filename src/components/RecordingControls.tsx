@@ -8,9 +8,10 @@ interface RecordingControlsProps {
   onStarted?: () => void
   onStopped?: () => void
   onPaused?: () => void
+  onUpload?: (file: File) => void
 }
 
-export function RecordingControls({ status, timer, className, onStarted, onStopped, onPaused }: RecordingControlsProps) {
+export function RecordingControls({ status, timer, className, onStarted, onStopped, onPaused, onUpload }: RecordingControlsProps) {
   const initialSeconds = useMemo(() => {
     const parts = timer.split(':')
     const m = parseInt(parts[0] || '0', 10)
@@ -119,6 +120,23 @@ export function RecordingControls({ status, timer, className, onStarted, onStopp
           >
             <Square className="w-5 h-5" />
           </button>
+        </div>
+        <div className="p-1 rounded-full border-2 border-dashed border-gray-300">
+          <label
+            className="inline-flex items-center justify-center rounded-full w-11 h-11 bg-blue-600 text-white hover:bg-blue-700 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            <input
+              type="file"
+              accept="audio/*"
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) onUpload?.(f)
+                e.currentTarget.value = ''
+              }}
+              className="hidden"
+            />
+            Upload
+          </label>
         </div>
       </div>
     </div>

@@ -39,6 +39,8 @@ export function MainScreen() {
   const [showPatients, setShowPatients] = useState(false)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const prevAudioUrlRef = useRef<string | null>(null)
+  const [transcript, setTranscript] = useState<{ speaker: string, text: string }[]>([])
+  const [uploading, setUploading] = useState(false)
   const [replaceOpen, setReplaceOpen] = useState(false)
   const [, setPendingOverwrite] = useState(false)
   const [stream, setStream] = useState<MediaStream | null>(null)
@@ -87,16 +89,21 @@ export function MainScreen() {
           if (passed?.id && full.size > 0) {
             const fd = new FormData()
             fd.append('file', full, `${passed.id}.${blobType.includes('ogg') ? 'ogg' : 'webm'}`)
-            api.post(`/audio/${passed.id}?mode=replace`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
-              .then(async () => {
-                try {
-                  const res = await api.get(`/audio/${passed.id}`, { responseType: 'blob', params: { t: Date.now() } })
-                  const url = URL.createObjectURL(res.data as Blob)
-                  const prev = prevAudioUrlRef.current
-                  if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev)
-                  setAudioUrl(url)
-                  prevAudioUrlRef.current = url
-                } catch { void 0 }
+            api.post(`/audio/${passed.id}/transcribe`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+              .then(async (res) => {
+                const prev = prevAudioUrlRef.current
+                if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev)
+                const url = URL.createObjectURL(full)
+                setAudioUrl(url)
+                prevAudioUrlRef.current = url
+                let text = res?.data?.transcription || ''
+                for (let i = 0; i < 300; i++) {
+                  const tr = await api.get(`/audio/${passed.id}/transcription`, { params: { t: Date.now() } })
+                  text = text || tr.data?.transcription || ''
+                  if (text) break
+                  await new Promise(r => setTimeout(r, 1000))
+                }
+                setTranscript(text ? text.split(/\n+/).map(line => ({ speaker: 'A', text: line })) : [])
               })
               .catch(() => {})
           }
@@ -132,16 +139,21 @@ export function MainScreen() {
             if (passed?.id && full.size > 0) {
               const fd = new FormData()
               fd.append('file', full, `${passed.id}.${blobType.includes('ogg') ? 'ogg' : 'webm'}`)
-              api.post(`/audio/${passed.id}?mode=replace`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
-                .then(async () => {
-                  try {
-                    const res = await api.get(`/audio/${passed.id}`, { responseType: 'blob', params: { t: Date.now() } })
-                    const url = URL.createObjectURL(res.data as Blob)
-                    const prev = prevAudioUrlRef.current
-                    if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev)
-                    setAudioUrl(url)
-                    prevAudioUrlRef.current = url
-                  } catch { void 0 }
+              api.post(`/audio/${passed.id}/transcribe`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+                .then(async (res) => {
+                  const prev = prevAudioUrlRef.current
+                  if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev)
+                  const url = URL.createObjectURL(full)
+                  setAudioUrl(url)
+                  prevAudioUrlRef.current = url
+                  let text = res?.data?.transcription || ''
+                  for (let i = 0; i < 300; i++) {
+                    const tr = await api.get(`/audio/${passed.id}/transcription`, { params: { t: Date.now() } })
+                    text = text || tr.data?.transcription || ''
+                    if (text) break
+                    await new Promise(r => setTimeout(r, 1000))
+                  }
+                  setTranscript(text ? text.split(/\n+/).map(line => ({ speaker: 'A', text: line })) : [])
                 })
                 .catch(() => {})
             }
@@ -233,7 +245,7 @@ export function MainScreen() {
   useEffect(() => {
     if (!passed?.id) return
     api.get(`/audio/${passed.id}`, { responseType: 'blob' })
-      .then(res => {
+      .then(async res => {
         const blob = res.data as Blob
         const url = URL.createObjectURL(blob)
         const prev = prevAudioUrlRef.current
@@ -242,11 +254,17 @@ export function MainScreen() {
         prevAudioUrlRef.current = url
         setRecordingStatus('paused')
         serverAudioRef.current = true
+        try {
+          const tr = await api.get(`/audio/${passed.id}/transcription`, { params: { t: Date.now() } })
+          const text = tr.data?.transcription || ''
+          setTranscript(text ? text.split(/\n+/).map(line => ({ speaker: 'A', text: line })) : [])
+        } catch { setTranscript([]) }
       })
       .catch(() => {
         setAudioUrl(null)
         setRecordingStatus('idle')
         serverAudioRef.current = false
+        setTranscript([])
       })
   }, [passed?.id])
 
@@ -323,6 +341,29 @@ export function MainScreen() {
         onStarted={() => handleStarted()}
         onPaused={handlePaused}
         onStopped={handleStopped}
+        onUpload={async (file) => {
+          try {
+            if (!passed?.id) return
+            const fd = new FormData()
+            fd.append('file', file, file.name)
+            setUploading(true)
+            const res = await api.post(`/audio/${passed.id}/transcribe`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+            const url = URL.createObjectURL(file)
+            const prev = prevAudioUrlRef.current
+            if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev)
+            setAudioUrl(url)
+            prevAudioUrlRef.current = url
+            let text = res?.data?.transcription || ''
+            for (let i = 0; i < 300; i++) {
+              const tr = await api.get(`/audio/${passed.id}/transcription`, { params: { t: Date.now() } })
+              text = text || tr.data?.transcription || ''
+              if (text) break
+              await new Promise(r => setTimeout(r, 1000))
+            }
+            setTranscript(text ? text.split(/\n+/).map(line => ({ speaker: 'A', text: line })) : [])
+            setUploading(false)
+          } catch {}
+        }}
       />
 
       {audioUrl && (
@@ -343,12 +384,7 @@ export function MainScreen() {
       {activeTab === 'Dictation' ? (
         <LiveTranscription
           status={isRecording ? 'Live' : 'Offline'}
-          transcript={[
-            { speaker: 'A', text: 'All right, Susan, let’s take a look at you here. Any changes in the eyes I need to know about? Any new floaters?' },
-            { speaker: 'B', text: 'No.' },
-            { speaker: 'A', text: 'Great. So let’s look at your scans of your retina, make sure that all looks okay.' },
-            { speaker: 'A', text: 'So far, your scans are looking good. Let’s take a look at your...' },
-          ]}
+          transcript={transcript}
         />
       ) : (
         <SoapNotePanel />
@@ -416,6 +452,14 @@ export function MainScreen() {
 
       {/* FOOTER ACTION BUTTONS */}
       <ActionButtons buttons={["Finalize", "Transfer"]} />
+      {uploading && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-md p-4 shadow-lg w-64 text-center">
+            <div className="animate-pulse text-gray-800 font-semibold">Uploading...</div>
+            <div className="mt-2 text-xs text-gray-600">Processing transcription</div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
