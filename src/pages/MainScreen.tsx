@@ -90,7 +90,7 @@ export function MainScreen() {
             const fd = new FormData()
             fd.append('file', full, `${passed.id}.${blobType.includes('ogg') ? 'ogg' : 'webm'}`)
             setUploading(true)
-            api.post(`/audio/${passed.id}/transcribe`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+            api.post(`/audio/${passed.id}/transcribe`, fd, { headers: { 'Content-Type': 'multipart/form-data' }, withCredentials: false })
               .then(async (res) => {
                 const prev = prevAudioUrlRef.current
                 if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev)
@@ -142,7 +142,7 @@ export function MainScreen() {
               const fd = new FormData()
               fd.append('file', full, `${passed.id}.${blobType.includes('ogg') ? 'ogg' : 'webm'}`)
               setUploading(true)
-              api.post(`/audio/${passed.id}/transcribe`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+              api.post(`/audio/${passed.id}/transcribe`, fd, { headers: { 'Content-Type': 'multipart/form-data' }, withCredentials: false })
                 .then(async (res) => {
                   const prev = prevAudioUrlRef.current
                   if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev)
@@ -351,7 +351,7 @@ export function MainScreen() {
             const fd = new FormData()
             fd.append('file', file, file.name)
             setUploading(true)
-            const res = await api.post(`/audio/${passed.id}/transcribe`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+            const res = await api.post(`/audio/${passed.id}/transcribe`, fd, { headers: { 'Content-Type': 'multipart/form-data' }, withCredentials: false })
             const url = URL.createObjectURL(file)
             const prev = prevAudioUrlRef.current
             if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev)

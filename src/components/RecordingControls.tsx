@@ -127,7 +127,7 @@ export function RecordingControls({ status, timer, className, onStarted, onStopp
           >
             <input
               type="file"
-              accept="audio/*"
+              accept="audio/ogg,audio/webm"
               onChange={(e) => {
                 const f = e.target.files?.[0]
                 if (f) onUpload?.(f)
